@@ -1,49 +1,50 @@
+import { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import PostCard from './components/PostCard';
 
 function App() {
-  // Dummy data simulating a database
-  const posts = [
-    {
-      id: 1,
-      author: "Sarah Bakery",
-      content: "I'm struggling with customer retention. We get new people, but they don't come back for a second visit. Does anyone use a loyalty program that actually works?",
-      type: "advice",
-      upvotes: 12
-    },
-    {
-      id: 2,
-      author: "TechStart AI",
-      content: "We just launched BizHive Analytics! It helps you track your most profitable customers automatically. Free trial for community members.",
-      type: "promotion",
-      upvotes: 45
-    },
-    {
-      id: 3,
-      author: "Mike Mechanic",
-      content: "Need help with local SEO. Google Maps ranking dropped suddenly. Any experts here?",
-      type: "advice",
-      upvotes: 8
-    }
-  ];
+  // 1. Create a "State" to hold the real posts
+  const [posts, setPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // 2. This runs AUTOMATICALLY when the app starts
+  useEffect(() => {
+    fetch('http://localhost:5000/api/posts')
+      .then(res => res.json())
+      .then(data => {
+        console.log("Data from server:", data);
+        setPosts(data); // Save the empty array [] to state
+        setLoading(false);
+      })
+      .catch(err => console.error("Error fetching posts:", err));
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      {/* Main Content Area */}
       <div className="max-w-2xl mx-auto pt-8 px-4 pb-20">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-800">Community Feed</h1>
           <p className="text-gray-500">See what's happening in the hive today.</p>
         </div>
 
-        {/* The Feed */}
-        <div className="space-y-6">
-          {posts.map(post => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
+        {/* 3. Show "Loading..." or the Feed */}
+        {loading ? (
+          <p className="text-center text-gray-500 mt-10">Connecting to Hive...</p>
+        ) : (
+          <div className="space-y-6">
+            {posts.length === 0 ? (
+              <div className="text-center py-10 bg-white rounded-xl border border-gray-100">
+                <p className="text-gray-500">No posts yet. Be the first to post!</p>
+              </div>
+            ) : (
+              posts.map(post => (
+                <PostCard key={post.id} post={post} />
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

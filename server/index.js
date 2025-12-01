@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { connectDB, sequelize } = require('./config/database');
 const Post = require('./models/Post'); // We import this so Sequelize knows to create the table
+const postRoutes = require('./routes/posts');
 
 const app = express();
 const PORT = 5000;
@@ -14,6 +15,9 @@ app.use(express.json());
 app.get('/', (req, res) => {
     res.send('BizHive SQL Backend is Running!');
 });
+
+// Routes
+app.use('/api/posts', postRoutes);
 
 // START THE SERVER
 const startServer = async () => {
