@@ -4,9 +4,13 @@ import PostCard from './components/PostCard';
 import CreatePost from './components/CreatePost';
 
 function App() {
-  // 1. Create a "State" to hold the real posts
+  // 1. State for Posts and Loading
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // 2. State for Tabs (The Filter) - Moved INSIDE the component
+  // We default to 'all' so the user sees everything at first
+  const [activeTab, setActiveTab] = useState('all'); 
 
   // Function to refresh feed after posting
   const refreshPosts = () => {
@@ -19,7 +23,7 @@ function App() {
       });
   };
   
-  // 2. This runs AUTOMATICALLY when the app starts
+  // 3. Fetch Data AUTOMATICALLY when app starts
   useEffect(() => {
     fetch('http://localhost:5000/api/posts')
       .then(res => res.json())
@@ -33,7 +37,8 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      {/* Pass the state to Navbar so buttons can change it */}
+      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="max-w-2xl mx-auto pt-8 px-4 pb-20">
         {/* Header */}
@@ -42,12 +47,12 @@ function App() {
           <p className="text-gray-500">See what's happening in the hive today.</p>
         </div>
 
-        {/* INPUT FORM - Added Here */}
+        {/* INPUT FORM */}
         <div className="mb-8">
           <CreatePost onPostCreated={refreshPosts} />
         </div>
 
-        {/* 3. Show "Loading..." or the Feed */}
+        {/* FEED LOGIC */}
         {loading ? (
           <p className="text-center text-gray-500 mt-10">Connecting to Hive...</p>
         ) : (
@@ -57,9 +62,12 @@ function App() {
                 <p className="text-gray-500">No posts yet. Be the first to post!</p>
               </div>
             ) : (
-              posts.map(post => (
-                <PostCard key={post.id} post={post} />
-              ))
+              // FILTER LOGIC: Show post if tab is 'all' OR if post type matches tab
+              posts
+                .filter(post => activeTab === 'all' || post.type === activeTab)
+                .map(post => (
+                  <PostCard key={post.id} post={post} />
+                ))
             )}
           </div>
         )}
