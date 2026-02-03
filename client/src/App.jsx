@@ -4,7 +4,7 @@ import PostCard from './components/PostCard';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import Leaderboard from './components/Leaderboard';
-import { Briefcase, TrendingUp, Award } from 'lucide-react';
+import { Briefcase, TrendingUp, Award, Image as ImageIcon, X } from 'lucide-react';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -12,6 +12,11 @@ function App() {
   const [activeTab, setActiveTab] = useState('growth');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [posts, setPosts] = useState([]);
+  
+  // ⭐ NEW: State for the file
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+
   const [newPost, setNewPost] = useState({
     title: '',
     content: '',
@@ -19,26 +24,22 @@ function App() {
   });
   const [toastMessage, setToastMessage] = useState('');
 
-  // ⭐ SAFE LOADING LOGIC (Self-Cleaning)
+  // Safe Loading Logic
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
-        // Extra check to make sure the data looks real
         if (parsedUser && parsedUser.id && parsedUser.token) {
            setUser(parsedUser);
         } else {
-           console.log("Found bad data, auto-cleaning...");
            localStorage.removeItem('user');
         }
       }
     } catch (error) {
-      console.error("Storage corrupted, resetting...", error);
       localStorage.removeItem('user');
       setUser(null);
     }
-    
     fetchPosts();
   }, []);
 
@@ -58,57 +59,67 @@ function App() {
     setUser(null);
   };
 
-  // ⭐ UPDATED: "LOUD" ERROR HANDLING
+  // ⭐ NEW: Handle File Selection
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        setImageFile(file);
+        // Create a fake URL just to show a preview before uploading
+        setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const removeImage = () => {
+      setImageFile(null);
+      setImagePreview(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!user) return alert('You must be logged in to post!');
 
-    // 1. Check for "Ghost User" (User exists but ID is missing)
     if (!user.id) {
-        alert("CRITICAL ERROR: Your account data is incomplete. Please Logout and Sign In again.");
+        alert("CRITICAL ERROR: Account incomplete. Please Logout and Login.");
         return;
     }
 
     try {
+      // ⭐ BIG CHANGE: Use FormData instead of JSON
+      const formData = new FormData();
+      formData.append('title', newPost.title);
+      formData.append('content', newPost.content);
+      formData.append('category', newPost.category);
+      formData.append('userId', user.id);
+      
+      if (imageFile) {
+          formData.append('image', imageFile);
+      }
+
       const response = await fetch('http://localhost:5000/api/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newPost, userId: user.id }) 
+        // Note: We do NOT set 'Content-Type': 'application/json' here.
+        // The browser sets the correct boundary automatically for FormData.
+        body: formData 
       });
 
       if (response.ok) {
-        // SUCCESS!
         const updatedUser = { ...user, karma: (user.karma || 0) + 10 };
         setUser(updatedUser);
         localStorage.setItem('user', JSON.stringify(updatedUser));
 
         setToastMessage('Post created! +10 Karma');
         setTimeout(() => setToastMessage(''), 3000);
+        
+        // Reset everything
         setIsModalOpen(false);
         setNewPost({ title: '', content: '', category: 'growth' });
+        setImageFile(null);
+        setImagePreview(null);
+        
         fetchPosts();
       } else {
-        // FAIL! (Read the error message from the server)
         const errorText = await response.text();
-        let errorMessage = "Unknown Server Error";
-        
-        try {
-            // Try to read it as JSON
-            const errorJson = JSON.parse(errorText);
-            errorMessage = errorJson.message;
-        } catch (e) {
-            // Fallback to plain text
-            errorMessage = errorText;
-        }
-
-        // 🚨 SHOW THE ERROR ON SCREEN
-        alert(`SERVER REJECTED POST:\n\n"${errorMessage}"`);
-
-        // If User Not Found (404), auto-logout to fix it
-        if (response.status === 404 || response.status === 500) {
-            alert("Database mismatch detected. Auto-logging you out to fix identity.");
-            handleLogout();
-        }
+        alert(`SERVER REJECTED POST: ${errorText}`);
       }
     } catch (error) {
       alert(`NETWORK ERROR: ${error.message}`);
@@ -124,7 +135,6 @@ function App() {
           </h1>
           <p className="text-gray-600 mt-2">The Professional Community Marketplace</p>
         </div>
-        
         {isLoginView ? (
           <Login 
             onLogin={(userData) => {
@@ -135,9 +145,7 @@ function App() {
             onSwitch={() => setIsLoginView(false)} 
           />
         ) : (
-          <Signup 
-            onSwitch={() => setIsLoginView(true)} 
-          />
+          <Signup onSwitch={() => setIsLoginView(true)} />
         )}
       </div>
     );
@@ -156,19 +164,13 @@ function App() {
                 <span>{user.karma || 0} Karma</span>
             </div>
             <span className="text-gray-600 hidden sm:block">Hello, <b>{user.username}</b></span>
-            <button 
-              onClick={handleLogout}
-              className="text-sm text-red-500 hover:text-red-700 font-medium"
-            >
-              Logout
-            </button>
+            <button onClick={handleLogout} className="text-sm text-red-500 hover:text-red-700 font-medium">Logout</button>
           </div>
         </div>
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
           <div className="lg:col-span-2">
             <div className="flex justify-between items-center mb-8">
               <div>
@@ -184,31 +186,18 @@ function App() {
             </div>
 
             <div className="flex bg-white rounded-lg p-1 shadow-sm mb-6 w-fit">
-              <button
-                onClick={() => setActiveTab('growth')}
-                className={`flex items-center gap-2 px-6 py-2 rounded-md transition ${activeTab === 'growth' ? 'bg-green-100 text-green-700 font-bold' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
+              <button onClick={() => setActiveTab('growth')} className={`flex items-center gap-2 px-6 py-2 rounded-md transition ${activeTab === 'growth' ? 'bg-green-100 text-green-700 font-bold' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <TrendingUp size={18} /> The Growth Hub
               </button>
-              <button
-                onClick={() => setActiveTab('showcase')}
-                className={`flex items-center gap-2 px-6 py-2 rounded-md transition ${activeTab === 'showcase' ? 'bg-purple-100 text-purple-700 font-bold' : 'text-gray-500 hover:bg-gray-50'}`}
-              >
+              <button onClick={() => setActiveTab('showcase')} className={`flex items-center gap-2 px-6 py-2 rounded-md transition ${activeTab === 'showcase' ? 'bg-purple-100 text-purple-700 font-bold' : 'text-gray-500 hover:bg-gray-50'}`}>
                 <Briefcase size={18} /> The Showcase
               </button>
             </div>
 
             <div className="grid gap-6">
-              {posts
-                .filter(post => post.category === activeTab)
-                .map(post => (
-                  <PostCard 
-                    key={post.id} 
-                    post={post} 
-                    currentUser={user} 
-                  />
-                ))}
-              
+              {posts.filter(post => post.category === activeTab).map(post => (
+                  <PostCard key={post.id} post={post} currentUser={user} />
+              ))}
               {posts.filter(post => post.category === activeTab).length === 0 && (
                 <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300">
                   <p>No posts here yet. Be the first!</p>
@@ -220,7 +209,6 @@ function App() {
           <div className="lg:col-span-1">
              <Leaderboard />
           </div>
-
         </div>
       </main>
 
@@ -236,52 +224,51 @@ function App() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <div className="grid grid-cols-2 gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setNewPost({...newPost, category: 'growth'})}
-                    className={`p-2 rounded border text-center ${newPost.category === 'growth' ? 'bg-green-100 border-green-500 text-green-700 font-bold' : 'border-gray-200 text-gray-500'}`}
-                  >
-                    Growth (Advice)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewPost({...newPost, category: 'showcase'})}
-                    className={`p-2 rounded border text-center ${newPost.category === 'showcase' ? 'bg-purple-100 border-purple-500 text-purple-700 font-bold' : 'border-gray-200 text-gray-500'}`}
-                  >
-                    Showcase (Promote)
-                  </button>
+                  <button type="button" onClick={() => setNewPost({...newPost, category: 'growth'})} className={`p-2 rounded border text-center ${newPost.category === 'growth' ? 'bg-green-100 border-green-500 text-green-700 font-bold' : 'border-gray-200 text-gray-500'}`}>Growth (Advice)</button>
+                  <button type="button" onClick={() => setNewPost({...newPost, category: 'showcase'})} className={`p-2 rounded border text-center ${newPost.category === 'showcase' ? 'bg-purple-100 border-purple-500 text-purple-700 font-bold' : 'border-gray-200 text-gray-500'}`}>Showcase (Promote)</button>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                <input 
-                  type="text" 
-                  className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder={newPost.category === 'growth' ? "e.g. How do I find my first client?" : "e.g. Launching my new AI tool!"}
-                  value={newPost.title}
-                  onChange={(e) => setNewPost({...newPost, title: e.target.value})}
-                  required
-                />
+                <input type="text" className="w-full border border-gray-300 rounded p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. My New Project" value={newPost.title} onChange={(e) => setNewPost({...newPost, title: e.target.value})} required />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Content</label>
-                <textarea 
-                  className="w-full border border-gray-300 rounded p-2 h-32 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                  placeholder="Share your thoughts..."
-                  value={newPost.content}
-                  onChange={(e) => setNewPost({...newPost, content: e.target.value})}
-                  required
-                ></textarea>
+                <textarea className="w-full border border-gray-300 rounded p-2 h-32 focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Share your thoughts..." value={newPost.content} onChange={(e) => setNewPost({...newPost, content: e.target.value})} required ></textarea>
               </div>
 
-              <button 
-                type="submit" 
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded transition"
-              >
-                Post to Community
-              </button>
+              {/* ⭐ NEW: Image Upload Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Add Image (Optional)</label>
+                
+                {!imagePreview ? (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition cursor-pointer relative">
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        <ImageIcon className="mx-auto text-gray-400 mb-2" />
+                        <span className="text-gray-500 text-sm">Click to upload an image</span>
+                    </div>
+                ) : (
+                    <div className="relative mt-2">
+                        <img src={imagePreview} alt="Preview" className="w-full h-40 object-cover rounded-lg" />
+                        <button 
+                            type="button" 
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600"
+                        >
+                            <X size={16} />
+                        </button>
+                    </div>
+                )}
+              </div>
+
+              <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded transition">Post to Community</button>
             </form>
           </div>
         </div>

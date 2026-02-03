@@ -2,23 +2,15 @@ import { useState } from 'react';
 import { Heart, MessageCircle, Share2 } from 'lucide-react';
 
 const PostCard = ({ post, currentUser }) => {
-  // 1. Check if the current user has ALREADY liked this specific post
-  // We look at the list of 'Likers' inside the post data
   const isOriginallyLiked = post.Likers?.some(liker => liker.id === currentUser.id);
 
-  // 2. Set up local state for this card
   const [liked, setLiked] = useState(isOriginallyLiked);
   const [likeCount, setLikeCount] = useState(post.Likers?.length || 0);
   const [isAnimating, setIsAnimating] = useState(false);
 
   const handleLike = async () => {
-    // Prevent liking if not logged in
-    if (!currentUser || !currentUser.id) {
-        alert("Please login to like posts!");
-        return;
-    }
+    if (!currentUser || !currentUser.id) return alert("Please login to like posts!");
 
-    // ⭐ UI OPTIMISM: Turn red IMMEDIATELY (makes it feel fast)
     const previousState = liked;
     const previousCount = likeCount;
 
@@ -33,20 +25,13 @@ const PostCard = ({ post, currentUser }) => {
         body: JSON.stringify({ userId: currentUser.id })
       });
 
-      if (!response.ok) {
-        // If server fails, revert the change
-        throw new Error('Server rejected like');
-      }
-      
-      // Stop the "pop" animation after 300ms
+      if (!response.ok) throw new Error('Server rejected like');
       setTimeout(() => setIsAnimating(false), 300);
 
     } catch (error) {
       console.error("Like failed:", error);
-      // Revert UI if network fails
       setLiked(previousState);
       setLikeCount(previousCount);
-      alert("Failed to like post. Check your connection.");
     }
   };
 
@@ -74,18 +59,24 @@ const PostCard = ({ post, currentUser }) => {
       <h2 className="text-xl font-bold text-gray-900 mb-2">{post.title}</h2>
       <p className="text-gray-600 leading-relaxed mb-4">{post.content}</p>
 
+      {/* ⭐ NEW: Display Image if it exists */}
+      {post.imageUrl && (
+          <div className="mb-4 rounded-lg overflow-hidden border border-gray-100">
+            {/* We point to localhost:5000 because that is where the images live */}
+            <img 
+                src={`http://localhost:5000${post.imageUrl}`} 
+                alt="Post Attachment" 
+                className="w-full h-auto max-h-96 object-cover"
+            />
+          </div>
+      )}
+
       <div className="flex items-center gap-6 border-t border-gray-100 pt-4">
         <button 
           onClick={handleLike}
-          className={`flex items-center gap-2 transition ${
-            liked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'
-          }`}
+          className={`flex items-center gap-2 transition ${liked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}`}
         >
-          <Heart 
-            size={20} 
-            fill={liked ? "currentColor" : "none"} 
-            className={`transition-transform ${isAnimating ? 'scale-125' : 'scale-100'}`}
-          />
+          <Heart size={20} fill={liked ? "currentColor" : "none"} className={`transition-transform ${isAnimating ? 'scale-125' : 'scale-100'}`} />
           <span className="font-medium">{likeCount}</span>
         </button>
 

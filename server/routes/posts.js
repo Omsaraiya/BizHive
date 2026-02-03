@@ -1,8 +1,33 @@
 const express = require('express');
+const multer = require('multer'); // ⭐ Import Multer
+const path = require('path');
 const Post = require('../models/Post');
 const User = require('../models/User');
 
 const router = express.Router();
+
+// ⭐ CONFIGURE STORAGE ENGINE
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/'); // Save files in the 'uploads' folder
+    },
+    filename: (req, file, cb) => {
+        // Create a unique name: "timestamp-originalName.jpg"
+        cb(null, Date.now() + '-' + file.originalname);
+    }
+});
+
+// Filter to only accept images
+const fileFilter = (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Not an image! Please upload an image.'), false);
+    }
+};
+
+const upload = multer({ storage: storage, fileFilter: fileFilter });
+
 
 // 1. GET ALL POSTS
 router.get('/', async (req, res) => {
@@ -21,15 +46,26 @@ router.get('/', async (req, res) => {
     }
 });
 
-// 2. CREATE POST
-router.post('/', async (req, res) => {
+// 2. CREATE POST (Now accepts 'image' file)
+// ⭐ Notice 'upload.single("image")' - this tells Multer to look for one file
+router.post('/', upload.single('image'), async (req, res) => {
     try {
         const { title, content, category, userId } = req.body;
+        
+        // Check if an image was uploaded
+        const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+
         if (!title || !content || !category || !userId) {
             return res.status(400).json({ message: 'All fields are required' });
         }
 
-        const newPost = await Post.create({ title, content, category, UserId: userId });
+        const newPost = await Post.create({ 
+            title, 
+            content, 
+            category, 
+            UserId: userId,
+            imageUrl // Save the path to database
+        });
         
         // Add Karma
         const user = await User.findByPk(userId);
@@ -67,5 +103,4 @@ router.put('/:id/like', async (req, res) => {
     }
 });
 
-// ⭐ CRITICAL: This must export 'router', NOT 'Post'
 module.exports = router;

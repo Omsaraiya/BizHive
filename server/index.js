@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); // ⭐ NEW: Tool for handling file paths
 const { connectDB, sequelize } = require('./config/database');
 
 // Import Models
@@ -17,16 +18,17 @@ const PORT = 5000;
 app.use(cors());
 app.use(express.json());
 
+// ⭐ NEW: Make the 'uploads' folder public so the frontend can display images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 app.get('/', (req, res) => {
     res.send('BizHive SQL Backend is Running!');
 });
 
-// ⭐ SAFETY CHECK: Prevent the "Class constructor" crash
-// This checks if the files are actually Routes before using them
+// Use Routes
+// Safety Check
 if (typeof postRoutes !== 'function') {
     console.error("❌ CRITICAL ERROR: server/routes/posts.js is exporting the wrong thing!");
-    console.error("--> Expected: A Router function");
-    console.error("--> Received:", postRoutes);
 } else {
     app.use('/api/posts', postRoutes);
 }
@@ -44,6 +46,7 @@ const startServer = async () => {
         User.belongsToMany(Post, { through: 'Likes' });
         Post.belongsToMany(User, { through: 'Likes', as: 'Likers' });
 
+        // ⭐ IMPORTANT: We changed the model, so we must update the table
         await sequelize.sync({ alter: true });
         console.log('✅ SQLite Database & Tables are ready!');
 
