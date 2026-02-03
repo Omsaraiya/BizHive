@@ -1,11 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path'); // ⭐ NEW: Tool for handling file paths
+const path = require('path');
 const { connectDB, sequelize } = require('./config/database');
 
 // Import Models
 const Post = require('./models/Post'); 
 const User = require('./models/User'); 
+const Comment = require('./models/Comment'); // ⭐ NEW 1: Import Comment
 
 // Import Routes
 const postRoutes = require('./routes/posts');
@@ -17,16 +18,13 @@ const PORT = 5000;
 
 app.use(cors());
 app.use(express.json());
-
-// ⭐ NEW: Make the 'uploads' folder public so the frontend can display images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.get('/', (req, res) => {
     res.send('BizHive SQL Backend is Running!');
 });
 
-// Use Routes
-// Safety Check
+// Routes
 if (typeof postRoutes !== 'function') {
     console.error("❌ CRITICAL ERROR: server/routes/posts.js is exporting the wrong thing!");
 } else {
@@ -43,10 +41,18 @@ const startServer = async () => {
         // Relationships
         User.hasMany(Post);
         Post.belongsTo(User);
+        
         User.belongsToMany(Post, { through: 'Likes' });
         Post.belongsToMany(User, { through: 'Likes', as: 'Likers' });
 
-        // ⭐ IMPORTANT: We changed the model, so we must update the table
+        // ⭐ NEW 2: Comment Relationships
+        User.hasMany(Comment);
+        Comment.belongsTo(User);
+
+        Post.hasMany(Comment);
+        Comment.belongsTo(Post);
+
+        // ⭐ NEW 3: Sync (Use 'alter: true' to update the DB without deleting data)
         await sequelize.sync({ alter: true });
         console.log('✅ SQLite Database & Tables are ready!');
 
