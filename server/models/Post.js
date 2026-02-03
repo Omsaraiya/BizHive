@@ -2,9 +2,9 @@ const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
 const Post = sequelize.define('Post', {
-    author: { type: DataTypes.STRING, allowNull: false },
+    title: { type: DataTypes.STRING, allowNull: false },
     content: { type: DataTypes.TEXT, allowNull: false },
-    type: { type: DataTypes.ENUM('advice', 'promotion'), defaultValue: 'advice' },
+    category: { type: DataTypes.ENUM('growth', 'showcase'), allowNull: false, defaultValue: 'growth' },
     upvotes: { type: DataTypes.INTEGER, defaultValue: 0 }
 });
 

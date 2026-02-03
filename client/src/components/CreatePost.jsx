@@ -2,20 +2,24 @@
 import { useState } from 'react';
 
 export default function CreatePost({ onPostCreated }) {
-  const [author, setAuthor] = useState('');
+  const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [postType, setPostType] = useState('advice');
+  const [postType, setPostType] = useState('growth');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!author.trim() || !content.trim()) {
+    if (!title.trim() || !content.trim()) {
       return;
     }
 
     try {
       setIsSubmitting(true);
+
+      const storedUser = localStorage.getItem('user');
+      const user = storedUser ? JSON.parse(storedUser) : null;
 
       const response = await fetch('http://localhost:5000/api/posts', {
         method: 'POST',
@@ -23,26 +27,31 @@ export default function CreatePost({ onPostCreated }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          author,
+          title,
           content,
-          type: postType,
+          category: postType,
+          userId: user?.id
         }),
       });
 
       if (!response.ok) {
         // Optionally handle error UI here
+        console.error('Create post failed', await response.text());
         return;
       }
 
       // Clear form
-      setAuthor('');
+      setTitle('');
       setContent('');
-      setPostType('advice');
+      setPostType('growth');
 
       // Notify parent
       if (typeof onPostCreated === 'function') {
         onPostCreated();
       }
+
+      setToast('Post created!');
+      setTimeout(() => setToast(''), 3000);
     } catch (error) {
       console.error('Failed to create post:', error);
     } finally {
@@ -50,8 +59,8 @@ export default function CreatePost({ onPostCreated }) {
     }
   };
 
-  const isAdvice = postType === 'advice';
-  const isPromotion = postType === 'promotion';
+  const isGrowth = postType === 'growth';
+  const isShowcase = postType === 'showcase';
 
   return (
     <div className="w-full max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
@@ -63,21 +72,21 @@ export default function CreatePost({ onPostCreated }) {
           </h2>
         </div>
 
-        {/* Author input */}
+        {/* Title input */}
         <div className="space-y-1">
           <label
-            htmlFor="author"
+            htmlFor="title"
             className="block text-sm font-medium text-gray-700"
           >
-            Your Name
+            Title
           </label>
           <input
-            id="author"
+            id="title"
             type="text"
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            placeholder="e.g. Rohan from StartupX"
-            value={author}
-            onChange={(e) => setAuthor(e.target.value)}
+            placeholder="Short descriptive title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
           />
         </div>
 
@@ -89,9 +98,9 @@ export default function CreatePost({ onPostCreated }) {
           <div className="inline-flex w-full sm:w-auto rounded-lg border border-gray-200 bg-gray-50 p-1">
             <button
               type="button"
-              onClick={() => setPostType('advice')}
+              onClick={() => setPostType('growth')}
               className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                isAdvice
+                isGrowth
                   ? 'bg-green-500 text-white shadow-sm'
                   : 'bg-transparent text-gray-700 hover:bg-green-50'
               }`}
@@ -100,9 +109,9 @@ export default function CreatePost({ onPostCreated }) {
             </button>
             <button
               type="button"
-              onClick={() => setPostType('promotion')}
+              onClick={() => setPostType('showcase')}
               className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                isPromotion
+                isShowcase
                   ? 'bg-purple-500 text-white shadow-sm'
                   : 'bg-transparent text-gray-700 hover:bg-purple-50'
               }`}
@@ -134,7 +143,7 @@ export default function CreatePost({ onPostCreated }) {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={isSubmitting || !author.trim() || !content.trim()}
+            disabled={isSubmitting || !title.trim() || !content.trim()}
             className="inline-flex items-center px-5 py-2.5 rounded-md text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           >
             {isSubmitting ? 'Posting...' : 'Post to BizHive'}

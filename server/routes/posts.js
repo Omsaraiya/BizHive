@@ -1,44 +1,71 @@
 const express = require('express');
-const router = express.Router();
-const Post = require('../models/Post'); // Import your SQL Model
+const Post = require('../models/Post');
+const User = require('../models/User');
 
-// @route   GET /api/posts
-// @desc    Get all posts (newest first)
+const router = express.Router();
+
+// 1. GET ALL POSTS
 router.get('/', async (req, res) => {
     try {
         const posts = await Post.findAll({
-            order: [['createdAt', 'DESC']] // Sort by newest
+            order: [['createdAt', 'DESC']],
+            include: [
+                { model: User, attributes: ['username', 'karma'] },
+                { model: User, as: 'Likers', attributes: ['id'] }
+            ]
         });
         res.json(posts);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+    } catch (error) {
+        console.error("Error fetching posts:", error);
+        res.status(500).json({ message: error.message });
     }
 });
 
-// @route   POST /api/posts
-// @desc    Create a new post
+// 2. CREATE POST
 router.post('/', async (req, res) => {
     try {
-        const { author, content, type } = req.body;
-
-        // Validation: Don't allow empty posts
-        if (!content || !author) {
-            return res.status(400).json({ message: 'Content and Author are required' });
+        const { title, content, category, userId } = req.body;
+        if (!title || !content || !category || !userId) {
+            return res.status(400).json({ message: 'All fields are required' });
         }
 
-        // Create the post in the SQLite database
-        const newPost = await Post.create({
-            author,
-            content,
-            type: type || 'advice'
-        });
+        const newPost = await Post.create({ title, content, category, UserId: userId });
+        
+        // Add Karma
+        const user = await User.findByPk(userId);
+        if (user) { 
+            user.karma += 10; 
+            await user.save(); 
+        }
 
-        res.json(newPost);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(201).json(newPost);
+    } catch (error) {
+        console.error("Error creating post:", error);
+        res.status(500).json({ message: error.message });
     }
 });
 
+// 3. TOGGLE LIKE
+router.put('/:id/like', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const post = await Post.findByPk(req.params.id);
+        
+        if (!post) return res.status(404).json({ message: 'Post not found' });
+
+        const hasLiked = await post.hasLiker(userId);
+        if (hasLiked) {
+            await post.removeLiker(userId);
+            res.json({ status: 'unliked' });
+        } else {
+            await post.addLiker(userId);
+            res.json({ status: 'liked' });
+        }
+    } catch (error) {
+        console.error("Like Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// ⭐ CRITICAL: This must export 'router', NOT 'Post'
 module.exports = router;
