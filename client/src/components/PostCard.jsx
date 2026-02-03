@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import { Heart, MessageCircle, Share2, Send } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Send, Trash2 } from 'lucide-react';
 
-const PostCard = ({ post, currentUser }) => {
+const PostCard = ({ post, currentUser, onDelete }) => {
   const isOriginallyLiked = post.Likers?.some(liker => liker.id === currentUser?.id);
+  
+  // ⭐ FIX 1: Use loose equality (==) to match String "1" vs Number 1
+  const isOwner = currentUser?.id == post.UserId; 
+
   const [liked, setLiked] = useState(isOriginallyLiked);
   const [likeCount, setLikeCount] = useState(post.Likers?.length || 0);
   const [isAnimating, setIsAnimating] = useState(false);
-  
-  // ⭐ Comment State
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState(post.Comments || []);
   const [newComment, setNewComment] = useState("");
@@ -20,15 +22,14 @@ const PostCard = ({ post, currentUser }) => {
     setIsAnimating(true);
     
     try {
-        const res = await fetch(`http://localhost:5000/api/posts/${post.id}/like`, {
+        await fetch(`http://localhost:5000/api/posts/${post.id}/like`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ userId: currentUser.id })
         });
-        if(!res.ok) throw new Error();
         setTimeout(() => setIsAnimating(false), 300);
     } catch (e) {
-        setLiked(previousLiked); // Revert
+        setLiked(previousLiked);
     }
   };
 
@@ -46,16 +47,48 @@ const PostCard = ({ post, currentUser }) => {
 
           if (response.ok) {
               const savedComment = await response.json();
-              setComments([...comments, savedComment]); // Add to list instantly
-              setNewComment(""); // Clear box
+              setComments([...comments, savedComment]);
+              setNewComment("");
           }
       } catch (error) {
           console.error("Comment failed", error);
       }
   };
 
+  const handleDelete = async () => {
+      if (window.confirm("Are you sure you want to delete this post?")) {
+          try {
+              const response = await fetch(`http://localhost:5000/api/posts/${post.id}`, {
+                  method: 'DELETE',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ userId: currentUser.id })
+              });
+
+              if (response.ok) {
+                  onDelete(post.id); 
+              } else {
+                  alert("Failed to delete post.");
+              }
+          } catch (error) {
+              console.error("Delete failed", error);
+          }
+      }
+  };
+
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition mb-6">
+    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition mb-6 relative group">
+      
+      {/* ⭐ FIX 2: Check if 'isOwner' is true. If yes, show the Red Trash Can always */}
+      {isOwner && (
+          <button 
+            onClick={handleDelete}
+            className="absolute top-4 right-4 bg-red-100 text-red-600 p-2 rounded-full hover:bg-red-600 hover:text-white transition"
+            title="Delete Post"
+          >
+              <Trash2 size={18} />
+          </button>
+      )}
+
       <div className="flex justify-between items-start mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold">
@@ -85,8 +118,7 @@ const PostCard = ({ post, currentUser }) => {
 
         <button 
             onClick={() => setShowComments(!showComments)}
-            className={`flex items-center gap-2 transition ${showComments ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-600'}`}
-        >
+            className={`flex items-center gap-2 transition ${showComments ? 'text-indigo-600' : 'text-gray-400 hover:text-indigo-600'}`}>
           <MessageCircle size={20} />
           <span className="font-medium">{comments.length} Comments</span>
         </button>
@@ -96,13 +128,11 @@ const PostCard = ({ post, currentUser }) => {
         </button>
       </div>
 
-      {/* ⭐ Comment Section */}
       {showComments && (
           <div className="mt-4 bg-gray-50 rounded-lg p-4 animate-fade-in">
-              {/* List Comments */}
               <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
                   {comments.length === 0 ? (
-                      <p className="text-gray-400 text-sm text-center">No comments yet. Be the first!</p>
+                      <p className="text-gray-400 text-sm text-center">No comments yet.</p>
                   ) : (
                       comments.map((comment, index) => (
                           <div key={index} className="flex gap-2 text-sm">
@@ -112,8 +142,6 @@ const PostCard = ({ post, currentUser }) => {
                       ))
                   )}
               </div>
-
-              {/* Add Comment Form */}
               <form onSubmit={handleCommentSubmit} className="flex gap-2">
                   <input 
                       type="text" 

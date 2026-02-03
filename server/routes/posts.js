@@ -27,9 +27,9 @@ router.get('/', async (req, res) => {
                 { model: User, attributes: ['username', 'karma'] },
                 { model: User, as: 'Likers', attributes: ['id'] },
                 // ⭐ NEW: Include Comments and their Authors
-                { 
-                    model: Comment, 
-                    include: [{ model: User, attributes: ['username'] }] 
+                {
+                    model: Comment,
+                    include: [{ model: User, attributes: ['username'] }]
                 }
             ]
         });
@@ -50,7 +50,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         }
 
         const newPost = await Post.create({ title, content, category, UserId: userId, imageUrl });
-        
+
         const user = await User.findByPk(userId);
         if (user) { user.karma += 10; await user.save(); }
 
@@ -110,3 +110,27 @@ router.post('/:id/comments', async (req, res) => {
 });
 
 module.exports = router;
+
+// 5. ⭐ NEW: DELETE POST
+router.delete('/:id', async (req, res) => {
+    try {
+        const { userId } = req.body; // We send userId to verify ownership
+        const postId = req.params.id;
+
+        const post = await Post.findByPk(postId);
+        if (!post) return res.status(404).json({ message: 'Post not found' });
+
+        // Security Check: Does the requester own the post?
+        // Note: We compare as strings to be safe
+        if (post.UserId.toString() !== userId.toString()) {
+            return res.status(403).json({ message: 'Unauthorized action' });
+        }
+
+        await post.destroy(); // The Kill Command 💀
+        res.json({ message: 'Post deleted successfully' });
+
+    } catch (error) {
+        console.error("Delete error:", error);
+        res.status(500).json({ message: error.message });
+    }
+});
